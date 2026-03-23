@@ -11,3 +11,6 @@ wheels/
 
 # Jetbrains generated files
 .idea
+
+# Ruff generated files
+.ruff_cache
