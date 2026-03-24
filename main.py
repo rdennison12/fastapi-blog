@@ -41,7 +41,9 @@ app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
 async def home(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
     posts = (
         await db.scalars(
-            select(models.Post).options(selectinload(models.Post.author)),
+            select(models.Post)
+            .options(selectinload(models.Post.author))
+            .order_by(models.Post.date_posted.desc()),
         )
     ).all()
     return templates.TemplateResponse(
@@ -61,7 +63,8 @@ async def post_page(
         await db.scalars(
             select(models.Post)
             .options(selectinload(models.Post.author))
-            .where(models.Post.id == post_id),
+            .where(models.Post.id == post_id)
+            .order_by(models.Post.date_posted.desc()),
         )
     ).first()
     if post:
@@ -102,6 +105,24 @@ async def user_posts_page(
         request,
         "user_posts.html",
         {"user": user, "posts": posts, "title": f"Posts by {user.username}"},
+    )
+
+
+@app.get("/login", include_in_schema=False)
+async def login_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {"title": "Login"},
+    )
+
+
+@app.get("/register", include_in_schema=False)
+async def register_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "register.html",
+        {"title": "Register"},
     )
 
 
