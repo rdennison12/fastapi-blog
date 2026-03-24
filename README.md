@@ -7,3 +7,4 @@
 * Begin to add asynchronization to the project
 * Refactored to use APIRouter
 * Started to add authentication
+* Authorization and authentication completed

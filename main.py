@@ -2,7 +2,10 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
-from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -13,16 +16,17 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import models
 from database import Base, engine, get_db
-from routers import users, posts
+from routers import posts, users
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Startup database connection
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    # Shutdown database connection
+    await engine.dispose()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -55,9 +59,9 @@ async def home(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
 
 @app.get("/posts/{post_id}", include_in_schema=False)
 async def post_page(
-        request: Request,
-        post_id: int,
-        db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+    post_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     post = (
         await db.scalars(
@@ -79,14 +83,13 @@ async def post_page(
 
 @app.get("/users/{user_id}/posts", include_in_schema=False, name="user_posts_page")
 async def user_posts_page(
-        request: Request,
-        user_id: int,
-        db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+    user_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     user = (
         await db.scalars(
-            select(models.User)
-            .where(models.User.id == user_id),
+            select(models.User).where(models.User.id == user_id),
         )
     ).first()
     if not user:
@@ -126,19 +129,28 @@ async def register_page(request: Request):
     )
 
 
-# StarletteHTTPException Handler
+@app.get("/account", include_in_schema=False)
+async def account_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "account.html",
+        {"title": "Account"},
+    )
+
+
 @app.exception_handler(StarletteHTTPException)
 async def general_http_exception_handler(
-        request: Request,
-        exception: StarletteHTTPException,
+    request: Request,
+    exception: StarletteHTTPException,
 ):
     if request.url.path.startswith("/api"):
         return await http_exception_handler(request, exception)
 
-    message = (exception.detail
-               if exception.detail
-               else
-               "An error occurred. Please check your request and try again.")
+    message = (
+        exception.detail
+        if exception.detail
+        else "An error occurred. Please check your request and try again."
+    )
     return templates.TemplateResponse(
         request,
         "error.html",
@@ -154,8 +166,8 @@ async def general_http_exception_handler(
 # RequestValidationError Handler
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
-        request: Request,
-        exception: RequestValidationError,
+    request: Request,
+    exception: RequestValidationError,
 ) -> Response:
     if request.url.path.startswith("/api"):
         return await request_validation_exception_handler(request, exception)
